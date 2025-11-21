@@ -63,15 +63,16 @@ class ElviaDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(minutes=1),
         )
 
-    async def _async_update_data(self) -> GridTariffCollection:
+    async def _async_update_data(self) -> dict[str, Any] | None:
         """Update data via library."""
 
         # Only update values once every hour, at the start of the hour.
         current_hour = datetime.now().time().hour
         if current_hour == self.last_hour_fetched:
-            return
-        else:
-            self.last_hour_fetched = current_hour
+            # Already fetched for this hour — return the last known data instead
+            return getattr(self, "data", None)
+
+        self.last_hour_fetched = current_hour
 
         try:
             self.meteringpoint = await self.api.meteringpoint()

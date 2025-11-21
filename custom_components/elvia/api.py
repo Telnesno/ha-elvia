@@ -48,7 +48,7 @@ class ElviaApiClient:
         self._metering_point_id = metering_point_id
         self._token = token
 
-    async def get(self, url: str, headers) -> Any:
+    async def get(self, url: str, headers: dict | None = None) -> Any:
         """Get request."""
         t = self.headers_with_api_key() if headers is None else headers
         return await self.api_wrapper(
@@ -57,7 +57,7 @@ class ElviaApiClient:
             headers=t,
         )
 
-    async def post(self, url: str, data: dict[str, Any] = {}) -> Any:
+    async def post(self, url: str, data: Any = None) -> Any:
         """Post request."""
         return await self.api_wrapper(
             method="POST", url=url, headers=self.headers_with_api_key(), data=data
@@ -67,9 +67,9 @@ class ElviaApiClient:
         self,
         method: str,
         url: str,
-        data: dict[str, Any] = {},
-        headers: dict = {},
-    ) -> dict[str, Any] or None:
+        data: Any = None,
+        headers: dict | None = None,
+    ) -> dict[str, Any] | None:
         """Wrap request."""
 
         LOGGER.debug(
@@ -81,6 +81,9 @@ class ElviaApiClient:
         )
 
         try:
+            # Avoid mutable default pitfalls
+            data = data or {}
+            headers = headers or {}
             async with async_timeout.timeout(20):
                 response = await self._session.request(
                     method=method,

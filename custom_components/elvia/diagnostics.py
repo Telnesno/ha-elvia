@@ -10,7 +10,6 @@ from homeassistant.core import HomeAssistant
 
 from custom_components.elvia.const import DOMAIN
 from custom_components.elvia.coordinator import ElviaDataUpdateCoordinator
-from custom_components.elvia.models import GridTariffCollection
 
 
 async def async_get_config_entry_diagnostics(
@@ -31,10 +30,19 @@ async def async_get_config_entry_diagnostics(
     if raw is None:
         return diagnostics
 
-    diagnostics["tariffPrice"] = json.dumps(raw.gridTariff.tariffPrice, default=str)
-    diagnostics["tariffType"] = json.dumps(raw.gridTariff.tariffType, default=str)
-    diagnostics["meteringPointsAndPriceLevels"] = json.dumps(
-        raw.meteringPointsAndPriceLevels, default=str
-    )
+    # Be defensive: ensure the raw object contains the expected attributes
+    grid = getattr(raw, "gridTariff", None)
+    mp_and_levels = getattr(raw, "meteringPointsAndPriceLevels", None)
+
+    if grid is None:
+        # Nothing useful to return for diagnostics
+        return diagnostics
+
+    diagnostics["tariffPrice"] = json.dumps(grid.tariffPrice, default=str)
+    diagnostics["tariffType"] = json.dumps(grid.tariffType, default=str)
+    if mp_and_levels is not None:
+        diagnostics["meteringPointsAndPriceLevels"] = json.dumps(
+            mp_and_levels, default=str
+        )
 
     return diagnostics
