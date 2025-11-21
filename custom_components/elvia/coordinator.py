@@ -80,10 +80,64 @@ class ElviaDataUpdateCoordinator(DataUpdateCoordinator):
             await self.map_meteringpoint_values(self.meteringpoint)
             await self.map_maxhour_values(self.maxhours)
 
-            return {
-                'meteringpoint': self.meteringpoint,
-                'maxhours': self.maxhours,
-            }
+            # Build a flattened data dict for sensors to read safely.
+            data: dict[str, object] = {}
+
+            # Keep raw objects available for diagnostics and other code.
+            data["meteringpoint"] = self.meteringpoint
+            data["maxhours"] = self.maxhours
+            data["tariff_prices"] = self.tariff_prices
+
+            # MPID (metering point id) for sensor-specific keys
+            mpid = str(self.api._metering_point_id) if hasattr(self.api, "_metering_point_id") else ""
+
+            # Core values
+            data["daily_tariff"] = self.energy_price
+            data[f"{mpid}_daily_tariff"] = self.energy_price
+
+            data["fixed_price_hourly"] = self.fixed_price_hourly
+            data[f"{mpid}_fixed_price_hourly"] = self.fixed_price_hourly
+
+            # Provide both a human-readable level info and the monthly numeric total
+            data["fixed_price_level"] = self.fixed_price_level_info
+            data[f"{mpid}_fixed_price_level"] = self.fixed_price_level_info
+
+            data["fixed_price_monthly"] = self.fixed_price_level
+            data[f"{mpid}_fixed_price_monthly"] = self.fixed_price_level
+
+            # Average max-hours
+            avg_curr = None
+            avg_prev = None
+            if self.mapped_maxhours:
+                avg_curr = self.mapped_maxhours.get("current_month", {}).get("average")
+                avg_prev = self.mapped_maxhours.get("previous_month", {}).get("average")
+
+            data["average_max_current"] = avg_curr
+            data[f"{mpid}_average_max_current"] = avg_curr
+            data["average_max_previous"] = avg_prev
+            data[f"{mpid}_average_max_previous"] = avg_prev
+
+            # Max-hours (1..3) for current and previous months, with start/end attributes
+            for month_key, suffix in (("current_month", "current"), ("previous_month", "previous")):
+                month_data = self.mapped_maxhours.get(month_key, {}) if self.mapped_maxhours else {}
+                for i in range(1, 4):
+                    base_key = f"max_hours_{suffix}_{i}"
+                    mp_key = f"{mpid}_{base_key}"
+
+                    entry = month_data.get(str(i), {}) if isinstance(month_data, dict) else {}
+
+                    value = entry.get("value") if isinstance(entry, dict) else None
+                    start = entry.get("startTime") if isinstance(entry, dict) else None
+                    end = entry.get("endTime") if isinstance(entry, dict) else None
+
+                    data[base_key] = value
+                    data[mp_key] = value
+                    data[f"{base_key}_start"] = start
+                    data[f"{mp_key}_start"] = start
+                    data[f"{base_key}_end"] = end
+                    data[f"{mp_key}_end"] = end
+
+            return data
         except (Error, ClientConnectorError) as error:
             LOGGER.error("Update error %s", error)
             raise UpdateFailed(error) from error

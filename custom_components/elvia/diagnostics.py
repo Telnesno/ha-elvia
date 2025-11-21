@@ -21,10 +21,20 @@ async def async_get_config_entry_diagnostics(
     diagnostics: dict[str, Any] = {}
 
     coordinator: ElviaDataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
-    data: GridTariffCollection = coordinator.data
+    # Coordinator.data is a flattened dict (see coordinator._async_update_data).
+    # Try to obtain the raw meteringpoint/GridTariffCollection from coordinator attributes
+    # or from the flattened dict (key "meteringpoint").
+    raw = getattr(coordinator, "meteringpoint", None)
+    if raw is None and isinstance(coordinator.data, dict):
+        raw = coordinator.data.get("meteringpoint")
 
-    diagnostics["tariffPrice"] = json.dumps(data.gridTariff.tariffPrice, default=str)
-    diagnostics["tariffType"] = json.dumps(data.gridTariff.tariffType, default=str)
-    diagnostics["meteringPointsAndPriceLevels"] = json.dumps(data.meteringPointsAndPriceLevels, default=str)
+    if raw is None:
+        return diagnostics
+
+    diagnostics["tariffPrice"] = json.dumps(raw.gridTariff.tariffPrice, default=str)
+    diagnostics["tariffType"] = json.dumps(raw.gridTariff.tariffType, default=str)
+    diagnostics["meteringPointsAndPriceLevels"] = json.dumps(
+        raw.meteringPointsAndPriceLevels, default=str
+    )
 
     return diagnostics
