@@ -195,6 +195,14 @@ async def async_setup_entry(
         for desc in descriptions
     ]
 
+    # If coordinator has no data yet, ask it to refresh so sensors are populated.
+    try:
+        if not getattr(coordinator, "data", None):
+            await coordinator.async_request_refresh()
+    except Exception:
+        # Don't fail setup if refresh fails; sensors will update on next scheduled refresh.
+        pass
+
     async_add_entities(entities)
 
 
